@@ -1,0 +1,9 @@
+# Backend
+backend/venv/
+backend/.env
+backend/__pycache__/
+backend/ecomind.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
