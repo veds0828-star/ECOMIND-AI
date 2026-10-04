@@ -17,57 +17,58 @@ function App() {
       });
   }, []);
 
-const sendMessage = async () => {
-  if (!message) return;
+  const sendMessage = async () => {
+    if (!message) return;
 
-  const userMessage = message;
+    const userMessage = message;
 
-  setChat((prev) => [...prev, { role: "user", text: userMessage }]);
-  setMessage("");
+    setChat((prev) => [...prev, { role: "user", text: userMessage }]);
+    setMessage("");
 
-  const res = await fetch("http://127.0.0.1:8000/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: userMessage }),
-  });
+    const res = await fetch("http://127.0.0.1:8000/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userMessage }),
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  setChat((prev) => [
-    ...prev,
-    {
-      role: "ai",
-      text: data.response,
-      question: userMessage,
-      facets: data.facets || [],
-      expanded: {},
-    },
-  ]);
-};
-
-const handleFacetClick = async (msgIndex, facet) => {
-  const targetMsg = chat[msgIndex];
-
-  const res = await fetch("http://127.0.0.1:8000/expand", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: targetMsg.question, facet }),
-  });
-
-  const data = await res.json();
-
-  setChat((prev) => {
-    const updated = [...prev];
-    updated[msgIndex] = {
-      ...updated[msgIndex],
-      expanded: {
-        ...updated[msgIndex].expanded,
-        [facet]: data.content,
+    setChat((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        text: data.response,
+        question: userMessage,
+        facets: data.facets || [],
+        expanded: {},
+        privacy: data.privacy || null,
       },
-    };
-    return updated;
-  });
-};
+    ]);
+  };
+
+  const handleFacetClick = async (msgIndex, facet) => {
+    const targetMsg = chat[msgIndex];
+
+    const res = await fetch("http://127.0.0.1:8000/expand", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: targetMsg.question, facet }),
+    });
+
+    const data = await res.json();
+
+    setChat((prev) => {
+      const updated = [...prev];
+      updated[msgIndex] = {
+        ...updated[msgIndex],
+        expanded: {
+          ...updated[msgIndex].expanded,
+          [facet]: data.content,
+        },
+      };
+      return updated;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col">
@@ -114,47 +115,66 @@ const handleFacetClick = async (msgIndex, facet) => {
           )}
 
           {chat.map((msg, index) => (
-  <div
-    key={index}
-    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-  >
-    <div
-      className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-        msg.role === "user"
-          ? "bg-emerald-600 text-neutral-950 font-medium rounded-br-sm"
-          : "bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-bl-sm"
-      }`}
-    >
-      <ReactMarkdown>{msg.text}</ReactMarkdown>
-
-      {msg.role === "ai" && msg.facets && msg.facets.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3">
-          {msg.facets.map((facet) => (
-            <button
-              key={facet}
-              onClick={() => handleFacetClick(index, facet)}
-              disabled={msg.expanded && msg.expanded[facet] !== undefined}
-              className="text-xs bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 px-3 py-1.5 rounded-full hover:bg-emerald-900/60 transition-colors disabled:opacity-40 disabled:cursor-default"
+            <div
+              key={index}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
-              {facet}
-            </button>
-          ))}
-        </div>
-      )}
+              <div
+                className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-emerald-600 text-neutral-950 font-medium rounded-br-sm"
+                    : "bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-bl-sm"
+                }`}
+              >
+                <ReactMarkdown>{msg.text}</ReactMarkdown>
 
-      {msg.expanded &&
-        Object.entries(msg.expanded).map(([facet, content]) => (
-          <div
-            key={facet}
-            className="mt-3 pt-3 border-t border-neutral-800 text-neutral-300"
-          >
-            <p className="text-xs font-semibold text-emerald-400 mb-1">{facet}</p>
-            <ReactMarkdown>{content}</ReactMarkdown>
-          </div>
-        ))}
-    </div>
-  </div>
-))}
+                {msg.role === "ai" && msg.privacy && msg.privacy.has_sensitive_data && (
+                  <div
+                    className={`mt-2 mb-1 text-xs px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                      msg.privacy.risk_level === "critical"
+                        ? "bg-red-950/40 border-red-800/50 text-red-400"
+                        : msg.privacy.risk_level === "high"
+                        ? "bg-orange-950/40 border-orange-800/50 text-orange-400"
+                        : "bg-yellow-950/40 border-yellow-800/50 text-yellow-400"
+                    }`}
+                  >
+                    <span>🔒</span>
+                    <span>
+                      Privacy protected — detected: {msg.privacy.detected_types.join(", ")}
+                      {" "}(risk: {msg.privacy.risk_level}). Sensitive data was masked before
+                      sending to the AI.
+                    </span>
+                  </div>
+                )}
+
+                {msg.role === "ai" && msg.facets && msg.facets.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {msg.facets.map((facet) => (
+                      <button
+                        key={facet}
+                        onClick={() => handleFacetClick(index, facet)}
+                        disabled={msg.expanded && msg.expanded[facet] !== undefined}
+                        className="text-xs bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 px-3 py-1.5 rounded-full hover:bg-emerald-900/60 transition-colors disabled:opacity-40 disabled:cursor-default"
+                      >
+                        {facet}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {msg.expanded &&
+                  Object.entries(msg.expanded).map(([facet, content]) => (
+                    <div
+                      key={facet}
+                      className="mt-3 pt-3 border-t border-neutral-800 text-neutral-300"
+                    >
+                      <p className="text-xs font-semibold text-emerald-400 mb-1">{facet}</p>
+                      <ReactMarkdown>{content}</ReactMarkdown>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Input bar */}
